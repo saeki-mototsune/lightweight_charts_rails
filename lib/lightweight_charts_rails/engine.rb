@@ -1,0 +1,30 @@
+# frozen_string_literal: true
+
+# Rails 8.1's rails/initializable.rb calls `delegate_missing_to` at class-body load time but does not
+# require this itself; a full `require "rails"` boot papers over the gap via active_support/rails.rb.
+# Since this engine is required standalone (no dummy app in this gem's own test suite), we must load it
+# explicitly before `rails/engine` pulls in rails/railtie -> rails/initializable.
+require "active_support/core_ext/module/delegation"
+require "rails/engine"
+
+module LightweightChartsRails
+  class Engine < ::Rails::Engine
+    PRECOMPILE_ASSETS = %w[lightweight-charts.js fancy-canvas.js lightweight-charts-rails.js].freeze
+
+    # propshaft / sprockets both pick up an engine's app/assets/* automatically; sprockets additionally
+    # needs the files listed for precompilation. propshaft defines an (unused) empty precompile array, so this is harmless there.
+    initializer "lightweight_charts_rails.assets" do |app|
+      if app.config.respond_to?(:assets) && app.config.assets.precompile
+        app.config.assets.precompile += PRECOMPILE_ASSETS
+      end
+    end
+
+    # importmap-rails draws every path in config.importmap.paths inside its own "importmap" initializer,
+    # so ours must be registered before it runs. Without importmap-rails the config key is absent and we do nothing.
+    initializer "lightweight_charts_rails.importmap", before: "importmap" do |app|
+      if app.config.respond_to?(:importmap)
+        app.config.importmap.paths << root.join("config/importmap.rb")
+      end
+    end
+  end
+end

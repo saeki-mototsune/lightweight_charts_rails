@@ -1,0 +1,8 @@
+/.bundle/
+/pkg/
+/tmp/
+/Gemfile.lock
+/node_modules/
+/test/dummy/log/
+/test/dummy/tmp/
+/test/dummy/public/assets/
