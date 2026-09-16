@@ -6,8 +6,10 @@ importmap, and ships a small Stimulus controller you subclass.
 
 ## Requirements
 
-- Rails >= 7.1 with `importmap-rails` and `stimulus-rails` (propshaft or sprockets).
+- Rails >= 7.1 with `importmap-rails` and `stimulus-rails`.
 - No jsbundling support: the JavaScript is served straight from the gem.
+- The test suite exercises propshaft. sprockets is expected to work too, since the engine adds the
+  vendored files to `config.assets.precompile`, but that path is untested.
 
 ## Installation
 
@@ -58,12 +60,6 @@ export default class extends LightweightChartController {
 Available on the controller: `chart` (IChartApi), `series` (Map name → ISeriesApi), `addSeries(type, options, { name, data })`,
 `setData(name, data)`, `update(name, point)`, `removeSeries(name)`, `fitContent()`. The framework-free core is also exported as `ChartHost`.
 
-## Updating the vendored JavaScript
-
-```bash
-bundle exec rake "lightweight_charts_rails:update[5.2.1]"   # version defaults to npm latest
-```
-
 ## Development
 
 ```bash
@@ -72,6 +68,15 @@ bundle exec rake test   # Ruby: engine + dummy app
 npm test                # JavaScript: node --test + jsdom
 bundle exec puma -p 3939 test/dummy/config.ru   # demo page at http://localhost:3939/
 ```
+
+### Updating the vendored JavaScript
+
+```bash
+bundle exec rake "lightweight_charts_rails:update[5.2.1]"   # version defaults to npm latest
+```
+
+This task lives in `tasks/` and is excluded from the packaged gem, so it must be run from a checkout
+of this repository, not from an application that depends on the gem.
 
 ## License
 
