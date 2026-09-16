@@ -1,5 +1,6 @@
 // lightweight-charts-rails: a thin Stimulus wrapper around TradingView lightweight-charts.
 // ChartHost is framework-free and owns one chart plus its named series; LightweightChartController (Task 5) wraps it.
+import { Controller } from "@hotwired/stimulus"
 import {
   createChart as defaultCreateChart,
   LineSeries,
@@ -80,3 +81,49 @@ export class ChartHost {
     this.chart.remove()
   }
 }
+
+// Stimulus controller: `data-controller="lightweight-chart"` with optional
+// `data-lightweight-chart-options-value` (chart options JSON) and
+// `data-lightweight-chart-series-value` ([{ type, name, options, data }] JSON).
+// Subclass it and call super.connect() before touching this.chart / this.addSeries().
+export class LightweightChartController extends Controller {
+  static values = { options: Object, series: Array }
+  // Extra options passed to ChartHost (e.g. { createChart } in tests). Read from the concrete class.
+  static chartHostOptions = {}
+
+  connect() {
+    this.host = new ChartHost(this.element, { options: this.optionsValue, ...this.constructor.chartHostOptions })
+    this.addDeclaredSeries()
+    this.destroyBeforeCache = () => this.host?.destroy()
+    document.addEventListener("turbo:before-cache", this.destroyBeforeCache)
+  }
+
+  disconnect() {
+    document.removeEventListener("turbo:before-cache", this.destroyBeforeCache)
+    this.host?.destroy()
+    this.host = null
+  }
+
+  // Stimulus also calls this once before connect(); there is no host yet, so ignore that call.
+  seriesValueChanged() {
+    if (!this.host || this.host.destroyed) return
+    this.host.removeAllSeries()
+    this.addDeclaredSeries()
+  }
+
+  addDeclaredSeries() {
+    for (const { type, name, options, data } of this.seriesValue) {
+      this.host.addSeries(type, options ?? {}, { name, data })
+    }
+  }
+
+  get chart() { return this.host.chart }
+  get series() { return this.host.series }
+  addSeries(type, seriesOptions, extra) { return this.host.addSeries(type, seriesOptions, extra) }
+  setData(name, data) { this.host.setData(name, data) }
+  update(name, point) { this.host.update(name, point) }
+  removeSeries(name) { this.host.removeSeries(name) }
+  fitContent() { this.host.fitContent() }
+}
+
+export default LightweightChartController
