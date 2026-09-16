@@ -1,0 +1,13 @@
+{
+  "name": "lightweight-charts-rails-dev",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test --import ./test/javascript/setup.mjs test/javascript/*.test.mjs"
+  },
+  "devDependencies": {
+    "@hotwired/stimulus": "^3.2.2",
+    "jsdom": "^29.0.0",
+    "lightweight-charts": "5.2.1"
+  }
+}
