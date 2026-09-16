@@ -1,0 +1,11 @@
+<h1>lightweight_charts_rails demo</h1>
+<p>Declarative Line + Histogram series rendered by <code>LightweightChartController</code>.</p>
+<div id="demo-chart"
+     style="height: 320px; border: 1px solid #ddd"
+     data-controller="lightweight-chart"
+     data-lightweight-chart-options-value="<%= { layout: { background: { color: '#ffffff' } } }.to_json %>"
+     data-lightweight-chart-series-value="<%= [
+       { type: 'Line', name: 'price', options: { color: '#2563eb', lineWidth: 2 }, data: @line },
+       { type: 'Histogram', name: 'volume', options: { priceScaleId: 'volume', priceFormat: { type: 'volume' } }, data: @volume }
+     ].to_json %>">
+</div>
