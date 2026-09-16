@@ -1,5 +1,8 @@
 # frozen_string_literal: true
 
+ENV["RAILS_ENV"] = "test"
 $LOAD_PATH.unshift File.expand_path("../lib", __dir__)
-require "lightweight_charts_rails"
+
+require_relative "dummy/config/environment"
+require "rails/test_help"
 require "minitest/autorun"
