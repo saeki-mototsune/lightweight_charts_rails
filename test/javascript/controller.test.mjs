@@ -114,6 +114,95 @@ test("changing the series value after connect rebuilds all series", async () => 
   assert.ok(calls.some(([name, series]) => name === "removeSeries" && series === original))
 })
 
+test("an unchanged declared series (same type and pane) is updated in place, not removed and re-added", async () => {
+  const element = await mount(`<div data-controller="lightweight-chart"
+    data-lightweight-chart-series-value='[{"type":"Line","name":"price","options":{"color":"blue"},"data":[{"time":1,"value":1}]}]'></div>`)
+  const controller = controllerOf(element)
+  const series = controller.series.get("price")
+  calls.length = 0
+
+  element.setAttribute("data-lightweight-chart-series-value", '[{"type":"Line","name":"price","options":{"color":"red"},"data":[{"time":1,"value":2}]}]')
+  await tick()
+
+  assert.equal(controller.series.get("price"), series)
+  assert.ok(!calls.some(([name]) => name === "removeSeries"))
+  assert.ok(!calls.some(([name]) => name === "addSeries"))
+  assert.ok(calls.some(([name, s, options]) => name === "series.applyOptions" && s === series && options.color === "red"))
+  assert.deepEqual(series.data, [{ time: 1, value: 2 }])
+})
+
+test("a declared series whose type changes is removed and re-added", async () => {
+  const element = await mount(`<div data-controller="lightweight-chart"
+    data-lightweight-chart-series-value='[{"type":"Line","name":"price"}]'></div>`)
+  const controller = controllerOf(element)
+  const original = controller.series.get("price")
+
+  element.setAttribute("data-lightweight-chart-series-value", '[{"type":"Area","name":"price"}]')
+  await tick()
+
+  assert.notEqual(controller.series.get("price"), original)
+  assert.equal(controller.series.get("price").definition, AreaSeries)
+  assert.ok(calls.some(([name, series]) => name === "removeSeries" && series === original))
+})
+
+test("a declared series whose pane changes is removed and re-added", async () => {
+  const element = await mount(`<div data-controller="lightweight-chart"
+    data-lightweight-chart-series-value='[{"type":"Line","name":"price","pane":0}]'></div>`)
+  const controller = controllerOf(element)
+  const original = controller.series.get("price")
+
+  element.setAttribute("data-lightweight-chart-series-value", '[{"type":"Line","name":"price","pane":1}]')
+  await tick()
+
+  assert.notEqual(controller.series.get("price"), original)
+  assert.equal(controller.series.get("price").paneIndex, 1)
+  assert.ok(calls.some(([name, series]) => name === "removeSeries" && series === original))
+})
+
+test("a declared series no longer present in the series value is removed", async () => {
+  const element = await mount(`<div data-controller="lightweight-chart"
+    data-lightweight-chart-series-value='[{"type":"Line","name":"price"},{"type":"Area","name":"volume"}]'></div>`)
+  const controller = controllerOf(element)
+  const volume = controller.series.get("volume")
+
+  element.setAttribute("data-lightweight-chart-series-value", '[{"type":"Line","name":"price"}]')
+  await tick()
+
+  assert.deepEqual([...controller.series.keys()], ["price"])
+  assert.ok(calls.some(([name, series]) => name === "removeSeries" && series === volume))
+})
+
+test("a subclass's imperatively-added series survives a declared series value change", async () => {
+  const element = await mount(`<div data-controller="sub-chart" data-sub-chart-label-value="mine"
+    data-sub-chart-series-value='[{"type":"Line","name":"declared"}]'></div>`)
+  const controller = controllerOf(element, "sub-chart")
+  const mine = controller.series.get("mine")
+
+  element.setAttribute("data-sub-chart-series-value", '[{"type":"Area","name":"declared2"}]')
+  await tick()
+
+  assert.equal(controller.series.get("mine"), mine)
+  assert.ok(!calls.some(([name, series]) => name === "removeSeries" && series === mine))
+  assert.deepEqual([...controller.series.keys()].sort(), ["declared2", "mine"])
+})
+
+test("unnamed declared entries keep stable series0/series1 names, updated in place across changes", async () => {
+  const element = await mount(`<div data-controller="lightweight-chart"
+    data-lightweight-chart-series-value='[{"type":"Line"},{"type":"Area"}]'></div>`)
+  const controller = controllerOf(element)
+  const first = controller.series.get("series0")
+  const second = controller.series.get("series1")
+  calls.length = 0
+
+  element.setAttribute("data-lightweight-chart-series-value", '[{"type":"Line","options":{"color":"red"}},{"type":"Area"}]')
+  await tick()
+
+  assert.deepEqual([...controller.series.keys()], ["series0", "series1"])
+  assert.equal(controller.series.get("series0"), first)
+  assert.equal(controller.series.get("series1"), second)
+  assert.ok(!calls.some(([name]) => name === "removeSeries" || name === "addSeries"))
+})
+
 test("changing the options value after connect applies the new options", async () => {
   const element = await mount(`<div data-controller="lightweight-chart"
     data-lightweight-chart-options-value='{"height": 200}'></div>`)
