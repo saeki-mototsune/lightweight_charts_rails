@@ -441,6 +441,28 @@ test("incoming DOM event listeners are removed on disconnect", async () => {
   assert.deepEqual(series.updates, [])
 })
 
+test("an incoming DOM event after turbo:before-cache but before disconnect is a harmless no-op", async () => {
+  // Turbo fires turbo:before-cache while the element is still attached, often well before Stimulus's
+  // MutationObserver later calls disconnect() when the element is actually removed. A Turbo Stream
+  // broadcast (or hand-dispatched event) landing in that gap must not throw against the destroyed host.
+  // A listener exception doesn't propagate out of dispatchEvent (per DOM spec); jsdom instead reports
+  // it as an uncaught "error" event on window, so that's what we listen for here.
+  const element = await mount(`<div data-controller="lightweight-chart"
+    data-lightweight-chart-series-value='[{"type":"Line","name":"price"}]'></div>`)
+  document.dispatchEvent(new Event("turbo:before-cache"))
+
+  const errors = []
+  const onError = (event) => errors.push(event.error ?? event.message)
+  window.addEventListener("error", onError)
+  try {
+    element.dispatchEvent(new CustomEvent("lightweight-chart:update", { detail: { name: "price", point: { time: 1, value: 5 } } }))
+  } finally {
+    window.removeEventListener("error", onError)
+  }
+
+  assert.deepEqual(errors, [])
+})
+
 test("crosshair-move and click handlers are unsubscribed on turbo:before-cache, before the host is destroyed", async () => {
   const element = await mount(`<div data-controller="lightweight-chart"></div>`)
   const controller = controllerOf(element)

@@ -248,7 +248,13 @@ export class LightweightChartController extends Controller {
     document.addEventListener("turbo:before-cache", this.destroyBeforeCache)
 
     this.incomingEventHandlers = Object.entries(INCOMING_EVENTS).map(([eventName, handler]) => {
-      const listener = (event) => handler(this.host, event.detail)
+      // Guard against the gap between turbo:before-cache (which destroys the host while this
+      // element is still live in the DOM) and disconnect() (which removes these listeners):
+      // an event arriving in that gap -- e.g. a Turbo Stream broadcast -- is a harmless no-op.
+      const listener = (event) => {
+        if (!this.host || this.host.destroyed) return
+        handler(this.host, event.detail)
+      }
       this.element.addEventListener(eventName, listener)
       return [eventName, listener]
     })
