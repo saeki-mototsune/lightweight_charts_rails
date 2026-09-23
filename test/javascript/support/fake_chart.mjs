@@ -5,21 +5,53 @@ export function fakeCreateChart(calls = []) {
     return {
       element,
       options,
-      addSeries(definition, seriesOptions) {
-        calls.push(["addSeries", definition, seriesOptions])
+      addSeries(definition, seriesOptions, ...paneIndex) {
+        calls.push(["addSeries", definition, seriesOptions, ...paneIndex])
         return {
           definition,
           seriesOptions,
+          paneIndex: paneIndex[0],
           data: null,
           updates: [],
+          priceLines: [],
           setData(data) { this.data = data },
-          update(point) { this.updates.push(point) }
+          update(point) { this.updates.push(point) },
+          applyOptions(options) {
+            calls.push(["series.applyOptions", this, options])
+          },
+          createPriceLine(options) {
+            const line = { options }
+            calls.push(["createPriceLine", this, options])
+            this.priceLines.push(line)
+            return line
+          },
+          removePriceLine(line) {
+            calls.push(["removePriceLine", this, line])
+            this.priceLines = this.priceLines.filter((l) => l !== line)
+          }
         }
       },
       removeSeries(series) { calls.push(["removeSeries", series]) },
       applyOptions(options) { calls.push(["applyOptions", options]) },
       remove() { calls.push(["remove"]) },
       timeScale() { return { fitContent: () => calls.push(["fitContent"]) } }
+    }
+  }
+}
+
+// A stand-in for lightweight-charts' createSeriesMarkers that records every call instead of drawing.
+export function fakeCreateSeriesMarkers(calls = []) {
+  return (series, markers = [], options) => {
+    calls.push(["createSeriesMarkers", series, markers, options])
+    let current = markers
+    return {
+      series,
+      setMarkers(newMarkers) {
+        current = newMarkers
+        calls.push(["setMarkers", series, newMarkers])
+      },
+      markers() { return current },
+      detach() { calls.push(["detach", series]) }
     }
   }
 }

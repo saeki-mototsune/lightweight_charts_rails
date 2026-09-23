@@ -3,7 +3,7 @@ import assert from "node:assert/strict"
 import { Application } from "@hotwired/stimulus"
 import { LineSeries, AreaSeries } from "lightweight-charts"
 import LightweightChartController, { ChartHost } from "../../app/assets/javascripts/lightweight-charts-rails.js"
-import { fakeCreateChart } from "./support/fake_chart.mjs"
+import { fakeCreateChart, fakeCreateSeriesMarkers } from "./support/fake_chart.mjs"
 
 const tick = () => new Promise((resolve) => setTimeout(resolve, 0))
 
@@ -26,8 +26,8 @@ class SubclassController extends LightweightChartController {
 
 beforeEach(() => {
   calls = []
-  TestController.chartHostOptions = { createChart: fakeCreateChart(calls) }
-  SubclassController.chartHostOptions = { createChart: fakeCreateChart(calls) }
+  TestController.chartHostOptions = { createChart: fakeCreateChart(calls), createSeriesMarkers: fakeCreateSeriesMarkers(calls) }
+  SubclassController.chartHostOptions = { createChart: fakeCreateChart(calls), createSeriesMarkers: fakeCreateSeriesMarkers(calls) }
   application = Application.start(document.documentElement)
   application.register("lightweight-chart", TestController)
   application.register("sub-chart", SubclassController)
@@ -148,6 +148,58 @@ test("delegated methods reach the host", async () => {
   assert.deepEqual(calls.at(-1), ["fitContent"])
   controller.removeSeries("vol")
   assert.equal(controller.series.size, 0)
+})
+
+test("series value entries pass pane, markers and priceLines through to the host", async () => {
+  const element = await mount(`<div data-controller="lightweight-chart"
+    data-lightweight-chart-series-value='[{"type":"Line","name":"price","pane":1,"markers":[{"time":1}],"priceLines":[{"price":10}]}]'></div>`)
+  const controller = controllerOf(element)
+  const series = controller.series.get("price")
+
+  assert.equal(series.paneIndex, 1)
+  assert.ok(controller.host.markerPlugins.get("price"))
+  assert.equal(controller.host.priceLines.get("price").length, 1)
+})
+
+test("fitContentValue calls fitContent after the declared series are added on connect", async () => {
+  const element = await mount(`<div data-controller="lightweight-chart"
+    data-lightweight-chart-fit-content-value="true"
+    data-lightweight-chart-series-value='[{"type":"Line","name":"a"}]'></div>`)
+  const addSeriesIndex = calls.findIndex(([name]) => name === "addSeries")
+  const fitContentIndex = calls.findIndex(([name]) => name === "fitContent")
+  assert.ok(addSeriesIndex >= 0 && fitContentIndex > addSeriesIndex)
+})
+
+test("without fitContentValue, connect does not call fitContent", async () => {
+  await mount(`<div data-controller="lightweight-chart"
+    data-lightweight-chart-series-value='[{"type":"Line","name":"a"}]'></div>`)
+  assert.ok(!calls.some(([name]) => name === "fitContent"))
+})
+
+test("fitContentValue calls fitContent again after a seriesValueChanged rebuild", async () => {
+  const element = await mount(`<div data-controller="lightweight-chart"
+    data-lightweight-chart-fit-content-value="true"
+    data-lightweight-chart-series-value='[{"type":"Line","name":"a"}]'></div>`)
+  const fitContentCallsAfterConnect = calls.filter(([name]) => name === "fitContent").length
+
+  element.setAttribute("data-lightweight-chart-series-value", '[{"type":"Area","name":"b"}]')
+  await tick()
+
+  const fitContentCallsAfterRebuild = calls.filter(([name]) => name === "fitContent").length
+  assert.equal(fitContentCallsAfterRebuild, fitContentCallsAfterConnect + 1)
+})
+
+test("controller#setMarkers delegates to the host", async () => {
+  const element = await mount(`<div data-controller="lightweight-chart"
+    data-lightweight-chart-series-value='[{"type":"Line","name":"price"}]'></div>`)
+  const controller = controllerOf(element)
+  const series = controller.series.get("price")
+
+  controller.setMarkers("price", [{ time: 1 }])
+  assert.deepEqual(calls.at(-1), ["createSeriesMarkers", series, [{ time: 1 }], undefined])
+
+  controller.setMarkers("price", [{ time: 2 }])
+  assert.deepEqual(calls.at(-1), ["setMarkers", series, [{ time: 2 }]])
 })
 
 test("a subclass can add its own values and series after super.connect()", async () => {
