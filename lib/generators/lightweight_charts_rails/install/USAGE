@@ -1,0 +1,15 @@
+Description:
+    Registers LightweightChartController under the "lightweight-chart" identifier
+    in app/javascript/controllers/index.js.
+
+    If the file already registers lightweight-charts-rails, the generator does
+    nothing (safe to run more than once). If the file is missing, nothing is
+    created; the two lines to add are printed instead.
+
+Example:
+    bin/rails generate lightweight_charts_rails:install
+
+    This appends to app/javascript/controllers/index.js:
+
+        import { LightweightChartController } from "lightweight-charts-rails"
+        application.register("lightweight-chart", LightweightChartController)
