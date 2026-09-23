@@ -97,6 +97,12 @@ test("fitContent delegates to the time scale", () => {
   assert.deepEqual(calls.at(-1), ["fitContent"])
 })
 
+test("applyOptions delegates to the chart", () => {
+  const { host, calls } = build()
+  host.applyOptions({ height: 300 })
+  assert.deepEqual(calls.at(-1), ["applyOptions", { height: 300 }])
+})
+
 test("destroy removes the chart once and clears series", () => {
   const { host, calls } = build()
   host.addSeries("Line")

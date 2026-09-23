@@ -114,6 +114,28 @@ test("changing the series value after connect rebuilds all series", async () => 
   assert.ok(calls.some(([name, series]) => name === "removeSeries" && series === original))
 })
 
+test("changing the options value after connect applies the new options", async () => {
+  const element = await mount(`<div data-controller="lightweight-chart"
+    data-lightweight-chart-options-value='{"height": 200}'></div>`)
+  assert.ok(!calls.some(([name]) => name === "applyOptions"))
+
+  element.setAttribute("data-lightweight-chart-options-value", '{"height": 300}')
+  await tick()
+
+  assert.deepEqual(calls.at(-1), ["applyOptions", { height: 300 }])
+})
+
+test("turbo:before-cache destroy then an options value change does not crash", async () => {
+  const element = await mount(`<div data-controller="lightweight-chart"
+    data-lightweight-chart-options-value='{"height": 200}'></div>`)
+  document.dispatchEvent(new Event("turbo:before-cache"))
+
+  element.setAttribute("data-lightweight-chart-options-value", '{"height": 300}')
+  await tick()
+
+  assert.ok(!calls.some(([name]) => name === "applyOptions"))
+})
+
 test("delegated methods reach the host", async () => {
   const element = await mount(`<div data-controller="lightweight-chart"></div>`)
   const controller = controllerOf(element)

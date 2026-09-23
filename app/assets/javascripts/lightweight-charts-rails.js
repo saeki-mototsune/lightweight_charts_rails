@@ -74,6 +74,10 @@ export class ChartHost {
     this.chart.timeScale().fitContent()
   }
 
+  applyOptions(options) {
+    this.chart.applyOptions(options)
+  }
+
   destroy() {
     if (this.destroyed) return
     this.destroyed = true
@@ -109,6 +113,12 @@ export class LightweightChartController extends Controller {
     if (!this.host || this.host.destroyed) return
     this.host.removeAllSeries()
     this.addDeclaredSeries()
+  }
+
+  // Stimulus also calls this once before connect(); there is no host yet, so ignore that call.
+  optionsValueChanged() {
+    if (!this.host || this.host.destroyed) return
+    this.host.applyOptions(this.optionsValue)
   }
 
   addDeclaredSeries() {

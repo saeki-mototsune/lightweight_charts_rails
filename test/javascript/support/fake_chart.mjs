@@ -17,6 +17,7 @@ export function fakeCreateChart(calls = []) {
         }
       },
       removeSeries(series) { calls.push(["removeSeries", series]) },
+      applyOptions(options) { calls.push(["applyOptions", options]) },
       remove() { calls.push(["remove"]) },
       timeScale() { return { fitContent: () => calls.push(["fitContent"]) } }
     }
