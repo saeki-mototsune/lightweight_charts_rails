@@ -33,15 +33,12 @@ module LightweightChartsRails
       end
     end
 
-    # turbo-rails is optional (dev/test dependency only, see Gemfile); without it Turbo is
-    # undefined and we add nothing. When it is present, Turbo::Streams::TagBuilder itself runs the
-    # :turbo_streams_tag_builder load hook at the end of its class body, so registering here (before
-    # that file loads) is enough -- no config.to_prepare fallback is needed.
+    # turbo-rails is optional. Turbo::Streams::TagBuilder runs the :turbo_streams_tag_builder load hook
+    # at the end of its class body, so without turbo-rails this block simply never fires. No
+    # defined?(Turbo) guard: that would depend on turbo-rails being required before this gem.
     initializer "lightweight_charts_rails.turbo_stream_actions" do
-      if defined?(Turbo)
-        ActiveSupport.on_load(:turbo_streams_tag_builder) do
-          include LightweightChartsRails::TurboStreamActions
-        end
+      ActiveSupport.on_load(:turbo_streams_tag_builder) do
+        include LightweightChartsRails::TurboStreamActions
       end
     end
   end

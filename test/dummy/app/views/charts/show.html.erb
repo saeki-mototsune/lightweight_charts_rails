@@ -15,8 +15,8 @@
           options: { color: "#2563eb", lineWidth: 2 },
           data: @line,
           markers: [
-            { time: @line[10][:time], position: "aboveBar", color: "#2563eb", shape: "arrowDown", text: "high" },
-            { time: @line[40][:time], position: "belowBar", color: "#2563eb", shape: "arrowUp", text: "low" }
+            { time: @line.max_by { _1[:value] }[:time], position: "aboveBar", color: "#2563eb", shape: "arrowDown", text: "high" },
+            { time: @line.min_by { _1[:value] }[:time], position: "belowBar", color: "#2563eb", shape: "arrowUp", text: "low" }
           ]
         },
         {
