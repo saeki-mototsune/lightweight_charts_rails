@@ -385,6 +385,62 @@ test("crosshair-move and click handlers are unsubscribed on disconnect", async (
   assert.equal(chart.clickHandler, null)
 })
 
+test("a lightweight-chart:update DOM event drives host.update", async () => {
+  const element = await mount(`<div data-controller="lightweight-chart"
+    data-lightweight-chart-series-value='[{"type":"Line","name":"price"}]'></div>`)
+  const controller = controllerOf(element)
+  const series = controller.series.get("price")
+
+  element.dispatchEvent(new CustomEvent("lightweight-chart:update", { detail: { name: "price", point: { time: 1, value: 5 } } }))
+
+  assert.deepEqual(series.updates, [{ time: 1, value: 5 }])
+})
+
+test("a lightweight-chart:set-data DOM event drives host.setData", async () => {
+  const element = await mount(`<div data-controller="lightweight-chart"
+    data-lightweight-chart-series-value='[{"type":"Line","name":"price"}]'></div>`)
+  const controller = controllerOf(element)
+  const series = controller.series.get("price")
+
+  element.dispatchEvent(new CustomEvent("lightweight-chart:set-data", { detail: { name: "price", data: [{ time: 1, value: 5 }] } }))
+
+  assert.deepEqual(series.data, [{ time: 1, value: 5 }])
+})
+
+test("a lightweight-chart:set-markers DOM event drives host.setMarkers", async () => {
+  const element = await mount(`<div data-controller="lightweight-chart"
+    data-lightweight-chart-series-value='[{"type":"Line","name":"price"}]'></div>`)
+  const controller = controllerOf(element)
+  const series = controller.series.get("price")
+
+  element.dispatchEvent(new CustomEvent("lightweight-chart:set-markers", { detail: { name: "price", markers: [{ time: 1 }] } }))
+
+  assert.deepEqual(calls.at(-1), ["createSeriesMarkers", series, [{ time: 1 }], undefined])
+})
+
+test("incoming DOM event names are fixed regardless of the controller's own identifier", async () => {
+  const element = await mount(`<div data-controller="sub-chart" data-sub-chart-label-value="mine"
+    data-sub-chart-series-value='[{"type":"Line","name":"price"}]'></div>`)
+  const controller = controllerOf(element, "sub-chart")
+  const series = controller.series.get("price")
+
+  element.dispatchEvent(new CustomEvent("lightweight-chart:update", { detail: { name: "price", point: { time: 1, value: 5 } } }))
+
+  assert.deepEqual(series.updates, [{ time: 1, value: 5 }])
+})
+
+test("incoming DOM event listeners are removed on disconnect", async () => {
+  const element = await mount(`<div data-controller="lightweight-chart"
+    data-lightweight-chart-series-value='[{"type":"Line","name":"price"}]'></div>`)
+  const series = controllerOf(element).series.get("price")
+  element.remove()
+  await tick()
+
+  element.dispatchEvent(new CustomEvent("lightweight-chart:update", { detail: { name: "price", point: { time: 1, value: 5 } } }))
+
+  assert.deepEqual(series.updates, [])
+})
+
 test("crosshair-move and click handlers are unsubscribed on turbo:before-cache, before the host is destroyed", async () => {
   const element = await mount(`<div data-controller="lightweight-chart"></div>`)
   const controller = controllerOf(element)

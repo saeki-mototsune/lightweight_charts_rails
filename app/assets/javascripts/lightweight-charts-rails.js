@@ -153,6 +153,51 @@ export class ChartHost {
   }
 }
 
+// Fixed DOM CustomEvent names LightweightChartController listens for on its own element (see
+// below), independent of the controller's identifier -- unlike the "connected" / "crosshair-move"
+// / "click" events it dispatches (Stimulus prefixes those with the identifier, e.g.
+// "lightweight-chart:connected" or "sub-chart:connected" for a subclass). Turbo Stream actions
+// below dispatch these same events, so server-driven updates and hand-dispatched ones look alike.
+const INCOMING_EVENTS = {
+  "lightweight-chart:update": (host, { name, point }) => host.update(name, point),
+  "lightweight-chart:set-data": (host, { name, data }) => host.setData(name, data),
+  "lightweight-chart:set-markers": (host, { name, markers }) => host.setMarkers(name, markers)
+}
+
+// Maps a turbo-stream action attribute to the incoming event name it should re-dispatch as.
+const TURBO_STREAM_ACTIONS = {
+  lightweight_chart_update: "lightweight-chart:update",
+  lightweight_chart_set_data: "lightweight-chart:set-data",
+  lightweight_chart_set_markers: "lightweight-chart:set-markers"
+}
+
+let turboStreamActionsInstalled = false
+
+// Installs custom turbo-stream actions (lightweight_chart_update / _set_data / _set_markers)
+// without importing @hotwired/turbo: it listens for Turbo's own "turbo:before-stream-render"
+// event and, only for those three actions, replaces the default render with one that parses the
+// stream element's <template> JSON and dispatches it as the matching INCOMING_EVENTS CustomEvent
+// on every target element (see Turbo::Streams::TagBuilder#lightweight_chart_* on the Ruby side).
+// Called once at module load below; idempotent so tests (and callers) can call it again safely.
+export function installTurboStreamActions() {
+  if (turboStreamActionsInstalled) return
+  turboStreamActionsInstalled = true
+
+  document.addEventListener("turbo:before-stream-render", (event) => {
+    const eventName = TURBO_STREAM_ACTIONS[event.target.getAttribute("action")]
+    if (!eventName) return
+
+    event.detail.render = (streamElement) => {
+      const payload = JSON.parse(streamElement.querySelector("template").content.textContent)
+      for (const target of streamElement.targetElements) {
+        target.dispatchEvent(new CustomEvent(eventName, { detail: payload }))
+      }
+    }
+  })
+}
+
+installTurboStreamActions()
+
 // Stimulus controller: `data-controller="lightweight-chart"` with optional
 // `data-lightweight-chart-options-value` (chart options JSON),
 // `data-lightweight-chart-series-value` ([{ type, name, options, data, pane, markers, priceLines }] JSON)
@@ -171,6 +216,13 @@ export class ChartHost {
 //     turbo:before-cache. detail: { time, logical, point, seriesData }, where seriesData is a
 //     plain object mapping series name -> data item (translated from the MouseEventParams
 //     seriesData Map via ChartHost#seriesDataByName; series unknown to this host are skipped).
+//
+// Listens on its own element (added in connect(), removed in disconnect()) for incoming DOM
+// CustomEvents with the fixed names in INCOMING_EVENTS above, so other code (or a Turbo Stream via
+// installTurboStreamActions()) can drive the chart without subclassing this controller:
+//   "lightweight-chart:update"      detail { name, point }   -> host.update(name, point)
+//   "lightweight-chart:set-data"    detail { name, data }    -> host.setData(name, data)
+//   "lightweight-chart:set-markers" detail { name, markers } -> host.setMarkers(name, markers)
 export class LightweightChartController extends Controller {
   static values = { options: Object, series: Array, fitContent: Boolean }
   // Extra options passed to ChartHost (e.g. { createChart } in tests). Read from the concrete class.
@@ -195,11 +247,20 @@ export class LightweightChartController extends Controller {
     }
     document.addEventListener("turbo:before-cache", this.destroyBeforeCache)
 
+    this.incomingEventHandlers = Object.entries(INCOMING_EVENTS).map(([eventName, handler]) => {
+      const listener = (event) => handler(this.host, event.detail)
+      this.element.addEventListener(eventName, listener)
+      return [eventName, listener]
+    })
+
     this.dispatch("connected", { detail: { chart: this.host.chart, controller: this } })
   }
 
   disconnect() {
     document.removeEventListener("turbo:before-cache", this.destroyBeforeCache)
+    for (const [eventName, listener] of this.incomingEventHandlers ?? []) {
+      this.element.removeEventListener(eventName, listener)
+    }
     this.unsubscribeChartEvents()
     this.host?.destroy()
     this.host = null

@@ -5,6 +5,6 @@ import { JSDOM } from "jsdom"
 const dom = new JSDOM("<!doctype html><html><body></body></html>", { url: "http://localhost/" })
 
 globalThis.window = dom.window
-for (const key of ["document", "MutationObserver", "HTMLElement", "Element", "Node", "Event", "CustomEvent"]) {
+for (const key of ["document", "MutationObserver", "HTMLElement", "Element", "Node", "Event", "CustomEvent", "EventTarget"]) {
   globalThis[key] = dom.window[key]
 }
