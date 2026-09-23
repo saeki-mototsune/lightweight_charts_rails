@@ -34,7 +34,25 @@ export function fakeCreateChart(calls = []) {
       removeSeries(series) { calls.push(["removeSeries", series]) },
       applyOptions(options) { calls.push(["applyOptions", options]) },
       remove() { calls.push(["remove"]) },
-      timeScale() { return { fitContent: () => calls.push(["fitContent"]) } }
+      timeScale() { return { fitContent: () => calls.push(["fitContent"]) } },
+      // Store the handler (rather than firing it) so tests can call it directly, e.g.
+      // chart.crosshairMoveHandler({ seriesData: new Map([[series, { time: 1 }]]) }).
+      subscribeCrosshairMove(handler) {
+        calls.push(["subscribeCrosshairMove", handler])
+        this.crosshairMoveHandler = handler
+      },
+      unsubscribeCrosshairMove(handler) {
+        calls.push(["unsubscribeCrosshairMove", handler])
+        if (this.crosshairMoveHandler === handler) this.crosshairMoveHandler = null
+      },
+      subscribeClick(handler) {
+        calls.push(["subscribeClick", handler])
+        this.clickHandler = handler
+      },
+      unsubscribeClick(handler) {
+        calls.push(["unsubscribeClick", handler])
+        if (this.clickHandler === handler) this.clickHandler = null
+      }
     }
   }
 }

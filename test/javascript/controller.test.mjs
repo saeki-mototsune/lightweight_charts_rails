@@ -299,3 +299,105 @@ test("a subclass can add its own values and series after super.connect()", async
   assert.deepEqual([...controller.series.keys()], ["declared", "mine"])
   assert.equal(controller.series.get("mine").definition, AreaSeries)
 })
+
+test("connected event fires once at the end of connect with the chart and controller in detail", async () => {
+  const events = []
+  document.addEventListener("lightweight-chart:connected", (event) => events.push(event))
+
+  const element = await mount(`<div data-controller="lightweight-chart"
+    data-lightweight-chart-series-value='[{"type":"Line","name":"price"}]'></div>`)
+  const controller = controllerOf(element)
+
+  assert.equal(events.length, 1)
+  assert.equal(events[0].detail.chart, controller.host.chart)
+  assert.equal(events[0].detail.controller, controller)
+  assert.equal(events[0].bubbles, true)
+})
+
+test("connected event uses the subclass's own Stimulus identifier as the prefix", async () => {
+  const events = []
+  document.addEventListener("sub-chart:connected", (event) => events.push(event))
+
+  await mount(`<div data-controller="sub-chart" data-sub-chart-label-value="mine"></div>`)
+
+  assert.equal(events.length, 1)
+})
+
+test("crosshair-move subscribes on connect and translates seriesData Map to a name-keyed object", async () => {
+  const element = await mount(`<div data-controller="lightweight-chart"
+    data-lightweight-chart-series-value='[{"type":"Line","name":"price"},{"type":"Area","name":"volume"}]'></div>`)
+  const controller = controllerOf(element)
+  const price = controller.series.get("price")
+  const volume = controller.series.get("volume")
+  const unknownSeries = { definition: LineSeries }
+
+  const events = []
+  document.addEventListener("lightweight-chart:crosshair-move", (event) => events.push(event))
+
+  controller.chart.crosshairMoveHandler({
+    time: 123,
+    logical: 4,
+    point: { x: 10, y: 20 },
+    seriesData: new Map([
+      [price, { time: 123, value: 1 }],
+      [unknownSeries, { time: 123, value: 99 }]
+    ])
+  })
+
+  assert.equal(events.length, 1)
+  assert.deepEqual(events[0].detail, {
+    time: 123,
+    logical: 4,
+    point: { x: 10, y: 20 },
+    seriesData: { price: { time: 123, value: 1 } }
+  })
+  assert.ok(!("volume" in events[0].detail.seriesData))
+})
+
+test("click subscribes on connect and translates seriesData the same way", async () => {
+  const element = await mount(`<div data-controller="lightweight-chart"
+    data-lightweight-chart-series-value='[{"type":"Line","name":"price"}]'></div>`)
+  const controller = controllerOf(element)
+  const price = controller.series.get("price")
+
+  const events = []
+  document.addEventListener("lightweight-chart:click", (event) => events.push(event))
+
+  controller.chart.clickHandler({ time: 5, logical: 1, point: { x: 1, y: 2 }, seriesData: new Map([[price, { time: 5, value: 9 }]]) })
+
+  assert.equal(events.length, 1)
+  assert.deepEqual(events[0].detail.seriesData, { price: { time: 5, value: 9 } })
+})
+
+test("crosshair-move and click handlers are unsubscribed on disconnect", async () => {
+  const element = await mount(`<div data-controller="lightweight-chart"></div>`)
+  const controller = controllerOf(element)
+  const chart = controller.chart
+  const crosshairHandler = chart.crosshairMoveHandler
+  const clickHandler = chart.clickHandler
+
+  element.remove()
+  await tick()
+
+  assert.ok(calls.some(([name, handler]) => name === "unsubscribeCrosshairMove" && handler === crosshairHandler))
+  assert.ok(calls.some(([name, handler]) => name === "unsubscribeClick" && handler === clickHandler))
+  assert.equal(chart.crosshairMoveHandler, null)
+  assert.equal(chart.clickHandler, null)
+})
+
+test("crosshair-move and click handlers are unsubscribed on turbo:before-cache, before the host is destroyed", async () => {
+  const element = await mount(`<div data-controller="lightweight-chart"></div>`)
+  const controller = controllerOf(element)
+  const chart = controller.chart
+
+  document.dispatchEvent(new Event("turbo:before-cache"))
+
+  const unsubscribeIndex = calls.findIndex(([name]) => name === "unsubscribeCrosshairMove")
+  const removeIndex = calls.findIndex(([name]) => name === "remove")
+  assert.ok(unsubscribeIndex >= 0 && removeIndex >= 0 && unsubscribeIndex < removeIndex)
+  assert.equal(chart.crosshairMoveHandler, null)
+
+  // disconnect() must stay safe after the host is already destroyed.
+  element.remove()
+  await tick()
+})

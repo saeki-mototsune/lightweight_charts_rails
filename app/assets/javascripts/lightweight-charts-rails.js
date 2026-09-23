@@ -108,6 +108,17 @@ export class ChartHost {
     }
   }
 
+  // Translates a MouseEventParams-style seriesData Map<ISeriesApi, data> into a plain object
+  // keyed by this host's series names. A series the Map carries but this host doesn't know
+  // (e.g. one added to another host, or already removed) is skipped.
+  seriesDataByName(seriesDataMap) {
+    const result = {}
+    for (const [name, series] of this.series) {
+      if (seriesDataMap.has(series)) result[name] = seriesDataMap.get(series)
+    }
+    return result
+  }
+
   removeSeries(name) {
     const series = this.seriesNamed(name)
     const plugin = this.markerPlugins.get(name)
@@ -147,6 +158,19 @@ export class ChartHost {
 // `data-lightweight-chart-series-value` ([{ type, name, options, data, pane, markers, priceLines }] JSON)
 // and `data-lightweight-chart-fit-content-value` (Boolean; fitContent() after series are (re)built).
 // Subclass it and call super.connect() before touching this.chart / this.addSeries().
+//
+// Dispatches Stimulus events for other controllers to react to (bubbling, named after this
+// controller's own identifier, e.g. "lightweight-chart:connected" or, for a subclass registered
+// as "sub-chart", "sub-chart:connected"):
+//   "connected" — fired at the end of connect(), after the declared series are added (and
+//     fitContent, if requested). detail: { chart, controller }. A subclass that calls
+//     super.connect() first and then adds its own series adds them AFTER this fires, so those
+//     series are not yet in detail.chart / controller.series when listeners see the event.
+//   "crosshair-move" / "click" — fired from chart.subscribeCrosshairMove / subscribeClick,
+//     subscribed on connect and unsubscribed on disconnect and before the host is destroyed on
+//     turbo:before-cache. detail: { time, logical, point, seriesData }, where seriesData is a
+//     plain object mapping series name -> data item (translated from the MouseEventParams
+//     seriesData Map via ChartHost#seriesDataByName; series unknown to this host are skipped).
 export class LightweightChartController extends Controller {
   static values = { options: Object, series: Array, fitContent: Boolean }
   // Extra options passed to ChartHost (e.g. { createChart } in tests). Read from the concrete class.
@@ -159,14 +183,36 @@ export class LightweightChartController extends Controller {
     this.declaredSeriesKeys = new Set()
     this.applyDeclaredSeries()
     if (this.fitContentValue) this.host.fitContent()
-    this.destroyBeforeCache = () => this.host?.destroy()
+
+    this.handleCrosshairMove = (params) => this.dispatch("crosshair-move", { detail: this.mouseEventDetail(params) })
+    this.handleClick = (params) => this.dispatch("click", { detail: this.mouseEventDetail(params) })
+    this.host.chart.subscribeCrosshairMove(this.handleCrosshairMove)
+    this.host.chart.subscribeClick(this.handleClick)
+
+    this.destroyBeforeCache = () => {
+      this.unsubscribeChartEvents()
+      this.host?.destroy()
+    }
     document.addEventListener("turbo:before-cache", this.destroyBeforeCache)
+
+    this.dispatch("connected", { detail: { chart: this.host.chart, controller: this } })
   }
 
   disconnect() {
     document.removeEventListener("turbo:before-cache", this.destroyBeforeCache)
+    this.unsubscribeChartEvents()
     this.host?.destroy()
     this.host = null
+  }
+
+  unsubscribeChartEvents() {
+    if (!this.host || this.host.destroyed) return
+    this.host.chart.unsubscribeCrosshairMove(this.handleCrosshairMove)
+    this.host.chart.unsubscribeClick(this.handleClick)
+  }
+
+  mouseEventDetail({ time, logical, point, seriesData }) {
+    return { time, logical, point, seriesData: this.host.seriesDataByName(seriesData) }
   }
 
   // Stimulus also calls this once before connect(); there is no host yet, so ignore that call.
