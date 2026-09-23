@@ -26,5 +26,11 @@ module LightweightChartsRails
         app.config.importmap.paths << root.join("config/importmap.rb")
       end
     end
+
+    initializer "lightweight_charts_rails.helper" do
+      ActiveSupport.on_load(:action_view) do
+        include LightweightChartsRails::Helper
+      end
+    end
   end
 end
