@@ -26,5 +26,20 @@ module LightweightChartsRails
         app.config.importmap.paths << root.join("config/importmap.rb")
       end
     end
+
+    initializer "lightweight_charts_rails.helper" do
+      ActiveSupport.on_load(:action_view) do
+        include LightweightChartsRails::Helper
+      end
+    end
+
+    # turbo-rails is optional. Turbo::Streams::TagBuilder runs the :turbo_streams_tag_builder load hook
+    # at the end of its class body, so without turbo-rails this block simply never fires. No
+    # defined?(Turbo) guard: that would depend on turbo-rails being required before this gem.
+    initializer "lightweight_charts_rails.turbo_stream_actions" do
+      ActiveSupport.on_load(:turbo_streams_tag_builder) do
+        include LightweightChartsRails::TurboStreamActions
+      end
+    end
   end
 end

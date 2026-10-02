@@ -1,11 +1,30 @@
 <h1>lightweight_charts_rails demo</h1>
-<p>Declarative Line + Histogram series rendered by <code>LightweightChartController</code>.</p>
-<div id="demo-chart"
-     style="height: 320px; border: 1px solid #ddd"
-     data-controller="lightweight-chart"
-     data-lightweight-chart-options-value="<%= { layout: { background: { color: '#ffffff' } } }.to_json %>"
-     data-lightweight-chart-series-value="<%= [
-       { type: 'Line', name: 'price', options: { color: '#2563eb', lineWidth: 2 }, data: @line },
-       { type: 'Histogram', name: 'volume', options: { priceScaleId: 'volume', priceFormat: { type: 'volume' } }, data: @volume }
-     ].to_json %>">
-</div>
+<p>
+  Declarative Line + Histogram series (via <code>lightweight_chart_tag</code>), rendered by
+  <code>LightweightChartController</code>. Volume is in its own pane, with a couple of markers on the price series.
+</p>
+<%= lightweight_chart_tag(
+      id: "demo-chart",
+      style: "height: 320px; border: 1px solid #ddd",
+      fit_content: true,
+      options: { layout: { background: { color: "#ffffff" } } },
+      series: [
+        {
+          type: "Line",
+          name: "price",
+          options: { color: "#2563eb", lineWidth: 2 },
+          data: @line,
+          markers: [
+            { time: @line.max_by { _1[:value] }[:time], position: "aboveBar", color: "#2563eb", shape: "arrowDown", text: "high" },
+            { time: @line.min_by { _1[:value] }[:time], position: "belowBar", color: "#2563eb", shape: "arrowUp", text: "low" }
+          ]
+        },
+        {
+          type: "Histogram",
+          name: "volume",
+          pane: 1,
+          options: { priceFormat: { type: "volume" } },
+          data: @volume
+        }
+      ]
+    ) %>

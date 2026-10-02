@@ -6,6 +6,7 @@ require "action_view/railtie"
 require "propshaft"
 require "importmap-rails"
 require "stimulus-rails"
+require "turbo-rails"
 require "lightweight_charts_rails"
 
 module Dummy
